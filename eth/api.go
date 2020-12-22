@@ -355,7 +355,7 @@ func (api *Eth2API) makeEnv(parent *types.Block, header *types.Header) error {
 
 // Structure described at https://hackmd.io/T9x2mMA4S7us8tJwEB3FDQ
 type ProduceBlockParams struct {
-	ParentRoot             common.Hash   `json:"parent_root"`
+	ParentHash             common.Hash   `json:"parent_hash"`
 	RandaoMix              common.Hash   `json:"randao_mix"`
 	Slot                   uint64        `json:"slot"`
 	Timestamp              uint64        `json:"timestamp"`
@@ -372,14 +372,15 @@ type ExecutableData struct {
 	ReceiptRoot  common.Hash          `json:"receipt_root"`
 	LogsBloom    []byte               `json:"logs_bloom"`
 	BlockHash    common.Hash          `json:"block_hash"`
+	ParentHash   common.Hash          `json:"parent_hash"`
 	Difficulty   *big.Int             `json:"difficulty"`
 }
 
 func (api *Eth2API) ProduceBlock(params ProduceBlockParams) (*ExecutableData, error) {
-	log.Info("Produce block", "parentHash", params.ParentRoot)
+	log.Info("Produce block", "parentHash", params.ParentHash)
 
 	bc := api.eth.BlockChain()
-	parent := bc.GetBlockByHash(params.ParentRoot)
+	parent := bc.GetBlockByHash(params.ParentHash)
 	pool := api.eth.TxPool()
 
 	if parent.Time() >= params.Timestamp {
@@ -507,21 +508,24 @@ func (api *Eth2API) ProduceBlock(params ProduceBlockParams) (*ExecutableData, er
 		LogsBloom:    block.Bloom().Bytes(),
 		BlockHash:    block.Hash(),
 		Difficulty:   block.Difficulty(),
+		ParentHash:   block.ParentHash(),
 	}, nil
 }
 
 // Structure described at https://hackmd.io/T9x2mMA4S7us8tJwEB3FDQ
 type InsertBlockParams struct {
-	ProduceBlockParams
-	BeaconBlockRoot common.Hash    `json:"beacon_block_root"`
-	ExecutableData  ExecutableData `json:"executable_data"`
+	RandaoMix              common.Hash   		`json:"randao_mix"`
+	Slot                   uint64        		`json:"slot"`
+	Timestamp              uint64        		`json:"timestamp"`
+	RecentBeaconBlockRoots []common.Hash  	`json:"recent_beacon_block_roots"`
+	ExecutableData  			 ExecutableData 	`json:"executable_data"`
 }
 
 var zeroNonce [8]byte
 
-func insertBlockParamsToBlock(params InsertBlockParams) *types.Block {
+func insertBlockParamsToBlock(params InsertBlockParams, number *big.Int) *types.Block {
 	header := &types.Header{
-		ParentHash:  params.ProduceBlockParams.ParentRoot,
+		ParentHash:  params.ExecutableData.ParentHash,
 		UncleHash:   types.EmptyUncleHash,
 		Coinbase:    params.ExecutableData.Coinbase,
 		Root:        params.ExecutableData.StateRoot,
@@ -529,7 +533,7 @@ func insertBlockParamsToBlock(params InsertBlockParams) *types.Block {
 		ReceiptHash: params.ExecutableData.ReceiptRoot,
 		Bloom:       types.BytesToBloom(params.ExecutableData.LogsBloom),
 		Difficulty:  params.ExecutableData.Difficulty,
-		Number:      big.NewInt(int64(params.ProduceBlockParams.Slot)),
+		Number:      number,
 		GasLimit:    params.ExecutableData.GasLimit,
 		GasUsed:     params.ExecutableData.GasUsed,
 		Time:        params.Timestamp,
@@ -542,10 +546,20 @@ func insertBlockParamsToBlock(params InsertBlockParams) *types.Block {
 	return block
 }
 
-func (api *Eth2API) InsertBlock(params InsertBlockParams) error {
-	block := insertBlockParamsToBlock(params)
+func (api *Eth2API) InsertBlock(params InsertBlockParams) (bool, error) {
+	// compute block number as parent.number + 1
+	parent := api.eth.BlockChain().GetBlockByHash(params.ExecutableData.ParentHash)
+	number := big.NewInt(0)
+	number.Add(parent.Number(), big.NewInt(1))
+
+	block := insertBlockParamsToBlock(params, number)
 	_, err := api.eth.BlockChain().InsertChainWithoutSealVerification(types.Blocks([]*types.Block{block}))
-	return err
+
+	if (err != nil) {
+		return false, err
+	} else {
+		return true, nil
+	}
 }
 
 func (api *Eth2API) AddBlockTxs(block *types.Block) error {
