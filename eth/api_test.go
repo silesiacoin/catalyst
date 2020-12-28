@@ -356,17 +356,13 @@ func TestEth2InsertBlock(t *testing.T) {
 		t.Fatalf("can't import test blocks: %v", err)
 	}
 
-	}
-
 	api := NewEth2API(ethservice)
 	for i := 5; i < 10; i++ {
 		p := InsertBlockParams{
-			ProduceBlockParams: ProduceBlockParams{
-				ParentRoot: ethservice.BlockChain().CurrentBlock().Hash(),
-				Slot:       blocks[i].NumberU64(),
-				Timestamp:  blocks[i].Time(),
-			},
+			Slot:      blocks[i].NumberU64(),
+			Timestamp: blocks[i].Time(),
 			ExecutableData: ExecutableData{
+				ParentHash:   ethservice.BlockChain().CurrentBlock().Hash(),
 				Coinbase:     blocks[i].Coinbase(),
 				StateRoot:    blocks[i].Root(),
 				Difficulty:   blocks[i].Difficulty(),
@@ -385,16 +381,15 @@ func TestEth2InsertBlock(t *testing.T) {
 	}
 
 	// Introduce the fork point
-	lastBlockHash, lastBlockNum := blocks[4].Hash(), blocks[4].NumberU64()
+	lastBlockNum := blocks[4].Number()
+	lastBlock := blocks[4]
 	for i := 0; i < 4; i++ {
-		lastBlockNum = lastBlockNum + 1
+		lastBlockNum.Add(lastBlockNum, big.NewInt(1))
 		p := InsertBlockParams{
-			ProduceBlockParams: ProduceBlockParams{
-				ParentRoot: lastBlockHash,
-				Slot:      lastBlockNum,
-				Timestamp: forkedBlocks[i].Time(),
-			},
+			Slot:      lastBlockNum.Uint64(),
+			Timestamp: forkedBlocks[i].Time(),
 			ExecutableData: ExecutableData{
+				ParentHash:   lastBlock.Hash(),
 				Coinbase:     forkedBlocks[i].Coinbase(),
 				StateRoot:    forkedBlocks[i].Root(),
 				Difficulty:   forkedBlocks[i].Difficulty(),
@@ -408,9 +403,9 @@ func TestEth2InsertBlock(t *testing.T) {
 		}
 		success, err := api.InsertBlock(p)
 		if err != nil || !success {
-			t.Fatalf("Failed to insert block: %v", err)
+			t.Fatalf("Failed to insert forked block #%d: %v", i, err)
 		}
-		insertBlockParamsToBlock(p, lastBlockNum).Hash()
+		lastBlock = insertBlockParamsToBlock(p, lastBlockNum)
 	}
 
 	exp := common.HexToHash("526db89301fc787799ef8c272fe512898b97ad96d0b69caee19dc5393b092110")
