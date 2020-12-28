@@ -514,11 +514,11 @@ func (api *Eth2API) ProduceBlock(params ProduceBlockParams) (*ExecutableData, er
 
 // Structure described at https://hackmd.io/T9x2mMA4S7us8tJwEB3FDQ
 type InsertBlockParams struct {
-	RandaoMix              common.Hash   		`json:"randao_mix"`
-	Slot                   uint64        		`json:"slot"`
-	Timestamp              uint64        		`json:"timestamp"`
-	RecentBeaconBlockRoots []common.Hash  	`json:"recent_beacon_block_roots"`
-	ExecutableData  			 ExecutableData 	`json:"executable_data"`
+	RandaoMix              common.Hash    `json:"randao_mix"`
+	Slot                   uint64         `json:"slot"`
+	Timestamp              uint64         `json:"timestamp"`
+	RecentBeaconBlockRoots []common.Hash  `json:"recent_beacon_block_roots"`
+	ExecutableData         ExecutableData `json:"executable_data"`
 }
 
 var zeroNonce [8]byte
@@ -549,17 +549,16 @@ func insertBlockParamsToBlock(params InsertBlockParams, number *big.Int) *types.
 func (api *Eth2API) InsertBlock(params InsertBlockParams) (bool, error) {
 	// compute block number as parent.number + 1
 	parent := api.eth.BlockChain().GetBlockByHash(params.ExecutableData.ParentHash)
+	if parent == nil {
+		return false, fmt.Errorf("could not find parent %x", params.ExecutableData.ParentHash)
+	}
 	number := big.NewInt(0)
 	number.Add(parent.Number(), big.NewInt(1))
 
 	block := insertBlockParamsToBlock(params, number)
 	_, err := api.eth.BlockChain().InsertChainWithoutSealVerification(types.Blocks([]*types.Block{block}))
 
-	if (err != nil) {
-		return false, err
-	} else {
-		return true, nil
-	}
+	return (err == nil), err
 }
 
 func (api *Eth2API) AddBlockTxs(block *types.Block) error {

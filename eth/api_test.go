@@ -285,7 +285,7 @@ func TestEth2ProduceBlock(t *testing.T) {
 	tx, err := types.SignTx(types.NewTransaction(0, blocks[8].Coinbase(), big.NewInt(1000), params.TxGas, nil, nil), signer, testKey)
 	ethservice.txPool.AddLocal(tx)
 	blockParams := ProduceBlockParams{
-		ParentRoot: blocks[8].ParentHash(),
+		ParentHash: blocks[8].ParentHash(),
 		Slot:       blocks[8].NumberU64(),
 		Timestamp:  blocks[8].Time(),
 	}
@@ -324,7 +324,7 @@ func TestEth2ProduceBlockWithAnotherBlocksTxs(t *testing.T) {
 	// Put the 10th block's tx in the pool and produce a new block
 	api.AddBlockTxs(blocks[9])
 	blockParams := ProduceBlockParams{
-		ParentRoot: blocks[9].ParentHash(),
+		ParentHash: blocks[9].ParentHash(),
 		Slot:       blocks[9].NumberU64(),
 		Timestamp:  blocks[9].Time(),
 	}
@@ -378,8 +378,8 @@ func TestEth2InsertBlock(t *testing.T) {
 				BlockHash:    blocks[i].Hash(),
 			},
 		}
-		err := api.InsertBlock(p)
-		if err != nil {
+		success, err := api.InsertBlock(p)
+		if err != nil || !success {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
 	}
@@ -406,11 +406,11 @@ func TestEth2InsertBlock(t *testing.T) {
 				BlockHash:    forkedBlocks[i].Hash(),
 			},
 		}
-		err := api.InsertBlock(p)
-		if err != nil {
+		success, err := api.InsertBlock(p)
+		if err != nil || !success {
 			t.Fatalf("Failed to insert block: %v", err)
 		}
-		lastBlockHash = insertBlockParamsToBlock(p).Hash()
+		insertBlockParamsToBlock(p, lastBlockNum).Hash()
 	}
 
 	exp := common.HexToHash("526db89301fc787799ef8c272fe512898b97ad96d0b69caee19dc5393b092110")
