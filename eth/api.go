@@ -376,6 +376,8 @@ type ExecutableData struct {
 	Difficulty   *big.Int             `json:"difficulty"`
 }
 
+// ProduceBlock creates a new block, inserts it into the chain, and returns the "execution
+// data" required for eth2 clients to process the new block.
 func (api *Eth2API) ProduceBlock(params ProduceBlockParams) (*ExecutableData, error) {
 	log.Info("Produce block", "parentHash", params.ParentHash)
 
@@ -546,6 +548,9 @@ func insertBlockParamsToBlock(params InsertBlockParams, number *big.Int) *types.
 	return block
 }
 
+// InsertBlock creates an Eth1 block, inserts it in the chain, and either returns true,
+// or false + an error. This is a bit redundant for go, but simplifies things on the
+// eth2 side.
 func (api *Eth2API) InsertBlock(params InsertBlockParams) (bool, error) {
 	// compute block number as parent.number + 1
 	parent := api.eth.BlockChain().GetBlockByHash(params.ExecutableData.ParentHash)
