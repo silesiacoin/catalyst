@@ -24,7 +24,7 @@ var (
 	testBalance = big.NewInt(2e10)
 )
 
-func TestEth2ProduceBlock(t *testing.T) {
+func TestExtraDataBLS(t *testing.T) {
 	genesis, blocks := generateTestChainWithBLSExtraData()
 	n, err := node.New(&node.Config{})
 	if err != nil {
